@@ -6,6 +6,9 @@
 
 #include "linglong/utils/error/error.h"
 
+#include <QMap>
+#include <QString>
+
 #include <functional>
 #include <string>
 
@@ -19,7 +22,8 @@ public:
     static void checkAuthorizationAsync(const std::string &actionId,
                                         const std::string &systemBusName,
                                         std::function<void(utils::error::Result<bool>)> callback,
-                                        bool userInteraction = true);
+                                        bool userInteraction = true,
+                                        const QMap<QString, QString> &details = {});
 };
 
 } // namespace linglong::service

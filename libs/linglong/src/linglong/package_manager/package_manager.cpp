@@ -88,9 +88,53 @@ QVariantMap toDBusReply(utils::error::ErrorCode code,
                                     .type = type });
 }
 
+// 构造 polkit 授权对话框的应用上下文 details (单包形态)。
+// 标准姿势 (参照 polkit CheckAuthorization 的 details 约定):
+// - "polkit.message": 静态 msgid, 含 $(key) 占位符。polkitd 会先经
+//   "polkit.gettext_domain" 指定的域按 agent locale (即用户会话 locale) 翻译,
+//   再用 details 中的同名 key 展开占位符, 展开后的文案将作为授权框文案
+//   (覆盖 .policy 的静态 message), 使用户在授权时能看到本次操作的具体对象;
+// - appid/version: 占位符展开源, 仅 polkitd 服务端使用, 不下发 agent;
+// - id 为空 (参数不可解析) 时返回空 details, 授权框行为与现状一致。
+QMap<QString, QString> packagePolkitDetails(const QString &messageId,
+                                            const std::string &id,
+                                            const std::optional<std::string> &version)
+{
+    if (id.empty()) {
+        return {};
+    }
+
+    QMap<QString, QString> details;
+    details.insert(QStringLiteral("polkit.gettext_domain"), QStringLiteral(PACKAGE_LOCALE_DOMAIN));
+    details.insert(QStringLiteral("polkit.message"), messageId);
+    details.insert(QStringLiteral("appid"), QString::fromStdString(id));
+    if (version) {
+        details.insert(QStringLiteral("version"), QString::fromStdString(*version));
+    }
+    return details;
+}
+
+// 多包形态 (update 批量): 包 id 列表经 $(appids) 注入, 空列表返回空 details
+QMap<QString, QString> packagesPolkitDetails(const std::vector<std::string> &ids)
+{
+    if (ids.empty()) {
+        return {};
+    }
+
+    QMap<QString, QString> details;
+    details.insert(QStringLiteral("polkit.gettext_domain"), QStringLiteral(PACKAGE_LOCALE_DOMAIN));
+    details.insert(QStringLiteral("polkit.message"),
+                   QString::fromUtf8(
+                     _("Authentication is required to update the applications $(appids)")));
+    details.insert(QStringLiteral("appids"),
+                   QString::fromStdString(common::strings::join(ids, ',')));
+    return details;
+}
+
 void checkPolkitAuthorizationAsync(const std::string &actionId,
                                    const std::string &systemBusName,
-                                   std::function<void(utils::error::Result<void>)> callback)
+                                   std::function<void(utils::error::Result<void>)> callback,
+                                   const QMap<QString, QString> &details = {})
 {
     PolkitAuthority::checkAuthorizationAsync(
       actionId,
@@ -108,7 +152,9 @@ void checkPolkitAuthorizationAsync(const std::string &actionId,
           }
 
           callback(LINGLONG_OK);
-      });
+      },
+      true,
+      details);
 }
 
 } // namespace
@@ -937,6 +983,10 @@ auto PackageManager::Install(const QVariantMap &parameters) noexcept -> QVariant
 
         CallerContext ctx{ conn, msg };
 
+        // 提前轻量解析 package id/version, 仅为授权框提供操作对象上下文; 解析失败不阻塞授权
+        auto installParas =
+          common::serialize::fromQVariantMap<api::types::v1::PackageManager1InstallParameters>(
+            parameters);
         checkPolkitAuthorizationAsync(
           "org.deepin.linglong.PackageManager1.install",
           msg.service().toStdString(),
@@ -950,7 +1000,17 @@ auto PackageManager::Install(const QVariantMap &parameters) noexcept -> QVariant
 
               auto result = installImpl(parameters, ctx);
               ctx.connection.send(ctx.message.createReply(result));
-          });
+          },
+          installParas
+            ? packagePolkitDetails(
+              QString::fromUtf8(installParas->package.version
+                                  ? _("Authentication is required to install the application "
+                                      "$(appid) (version $(version))")
+                                  : _("Authentication is required to install the application "
+                                      "$(appid)")),
+              installParas->package.id,
+              installParas->package.version)
+            : QMap<QString, QString>{});
         return {};
     }
 
@@ -1017,6 +1077,10 @@ auto PackageManager::Uninstall(const QVariantMap &parameters) noexcept -> QVaria
 
         CallerContext ctx{ conn, msg };
 
+        // 提前轻量解析 package id/version, 仅为授权框提供操作对象上下文; 解析失败不阻塞授权
+        auto uninstallParas =
+          common::serialize::fromQVariantMap<api::types::v1::PackageManager1UninstallParameters>(
+            parameters);
         checkPolkitAuthorizationAsync(
           "org.deepin.linglong.PackageManager1.uninstall",
           msg.service().toStdString(),
@@ -1030,7 +1094,17 @@ auto PackageManager::Uninstall(const QVariantMap &parameters) noexcept -> QVaria
 
               auto result = uninstallImpl(parameters, ctx);
               ctx.connection.send(ctx.message.createReply(result));
-          });
+          },
+          uninstallParas
+            ? packagePolkitDetails(
+              QString::fromUtf8(uninstallParas->package.version
+                                  ? _("Authentication is required to uninstall the application "
+                                      "$(appid) (version $(version))")
+                                  : _("Authentication is required to uninstall the application "
+                                      "$(appid)")),
+              uninstallParas->package.id,
+              uninstallParas->package.version)
+            : QMap<QString, QString>{});
         return {};
     }
 
@@ -1220,6 +1294,17 @@ auto PackageManager::Update(const QVariantMap &parameters) noexcept -> QVariantM
 
         CallerContext ctx{ conn, msg };
 
+        // 提前轻量解析 package 列表, 仅为授权框提供操作对象上下文; 解析失败不阻塞授权
+        auto updateParas =
+          common::serialize::fromQVariantMap<api::types::v1::PackageManager1UpdateParameters>(
+            parameters);
+        std::vector<std::string> updateIds;
+        if (updateParas) {
+            updateIds.reserve(updateParas->packages.size());
+            for (const auto &pkg : updateParas->packages) {
+                updateIds.push_back(pkg.id);
+            }
+        }
         checkPolkitAuthorizationAsync(
           "org.deepin.linglong.PackageManager1.update",
           msg.service().toStdString(),
@@ -1233,7 +1318,8 @@ auto PackageManager::Update(const QVariantMap &parameters) noexcept -> QVariantM
 
               auto result = updateImpl(parameters, ctx);
               ctx.connection.send(ctx.message.createReply(result));
-          });
+          },
+          packagesPolkitDetails(updateIds));
         return {};
     }
 

@@ -1122,3 +1122,27 @@ msgstr ""
 #: ../libs/linglong/src/linglong/common/cli/repo.cpp:124
 msgid "Disable mirror for the repo"
 msgstr ""
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1007
+msgid ""
+"Authentication is required to install the application $(appid) (version "
+"$(version))"
+msgstr ""
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1009
+msgid "Authentication is required to install the application $(appid)"
+msgstr ""
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1101
+msgid ""
+"Authentication is required to uninstall the application $(appid) (version "
+"$(version))"
+msgstr ""
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1103
+msgid "Authentication is required to uninstall the application $(appid)"
+msgstr ""
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:128
+msgid "Authentication is required to update the applications $(appids)"
+msgstr ""

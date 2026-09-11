@@ -1215,3 +1215,27 @@ msgstr "用于镜像选择的国家/地区代码，例如 CN、US"
 #: ../libs/linglong/src/linglong/common/cli/repo.cpp:124
 msgid "Disable mirror for the repo"
 msgstr "禁用仓库镜像"
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1007
+msgid ""
+"Authentication is required to install the application $(appid) (version "
+"$(version))"
+msgstr "安装应用 $(appid)（版本 $(version)）需要认证"
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1009
+msgid "Authentication is required to install the application $(appid)"
+msgstr "安装应用 $(appid) 需要认证"
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1101
+msgid ""
+"Authentication is required to uninstall the application $(appid) (version "
+"$(version))"
+msgstr "卸载应用 $(appid)（版本 $(version)）需要认证"
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:1103
+msgid "Authentication is required to uninstall the application $(appid)"
+msgstr "卸载应用 $(appid) 需要认证"
+
+#: ../libs/linglong/src/linglong/package_manager/package_manager.cpp:128
+msgid "Authentication is required to update the applications $(appids)"
+msgstr "更新应用 $(appids) 需要认证"

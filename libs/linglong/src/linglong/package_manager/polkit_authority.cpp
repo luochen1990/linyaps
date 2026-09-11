@@ -90,7 +90,8 @@ void PolkitAuthority::checkAuthorizationAsync(
   const std::string &actionId,
   const std::string &systemBusName,
   std::function<void(utils::error::Result<bool>)> callback,
-  bool userInteraction)
+  bool userInteraction,
+  const QMap<QString, QString> &details)
 {
     LINGLONG_TRACE("check polkit authorization");
 
@@ -108,8 +109,12 @@ void PolkitAuthority::checkAuthorizationAsync(
     subject.details.insert(QStringLiteral("name"),
                            QVariant::fromValue(QString::fromStdString(systemBusName)));
 
+    // details 随请求透传: polkitd 会将 details 中的保留 key "polkit.message"
+    // (经 "polkit.gettext_domain" 域按 agent locale 翻译, 并展开 $(key) 占位符)
+    // 作为授权对话框的显示文案, 覆盖 .policy 的静态 message, 使授权框能展示本次
+    // 操作的具体对象 (appid/version)。空 details 时行为与以往完全一致。
     msg << QVariant::fromValue(subject) << QString::fromStdString(actionId)
-        << QVariant::fromValue(QMap<QString, QString>())
+        << QVariant::fromValue(details)
         << static_cast<uint>(userInteraction ? 1 : 0) << QString();
 
     auto pendingCall = bus.asyncCall(msg);
